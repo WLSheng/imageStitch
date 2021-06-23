@@ -10,3 +10,6 @@ image_stitch
 
 
 ![jigui_1_optical_flow_result](https://user-images.githubusercontent.com/49335389/123021987-a3a08e00-d407-11eb-9063-87a3af80c3e2.png)
+
+
+顺带2021.06.22 测试了苹果12手机自带相机的全景功能，只能单方向，在光滑无特征的环境下拼接测试时，发现是用了左半部分的图片拼右半部分的，估计也是用了光流法。
