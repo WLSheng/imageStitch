@@ -5,9 +5,9 @@ import cv2
 import time
 
 
-lk_params = dict(winSize=(15, 15),
-                 maxLevel=2,
-                 criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+lk_params = dict(winSize=(15, 15),  # 从下一帧中在金字塔找指定窗口大小的特征，增大些有益于匹配关键点，相机移动过快需要调大些
+                 maxLevel=2,        # 金字塔数，0为不使用，
+                 criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))  # 迭代搜索算法的终止准则，最大迭代数和迭代半径？
 
 feature_params = dict(maxCorners=200,
                       qualityLevel=0.3,
