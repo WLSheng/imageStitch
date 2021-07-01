@@ -17,15 +17,15 @@ app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024
 @app.route('/imageStitch', methods=['POST'])
 def imageStitch():
     try:
-        # para = json.loads(flask.request.get_data())
-        # org_video = para['video_file']
-        file = flask.request.files.get('video_file')
-        save_name = "./cache/" + time.strftime("%Y_%m_%d-%H_%M_%S") + ".mp4"
-        file.save(save_name)
-        print(f'============= image stitch get mp4 file ======= name: {save_name} ==================')
-        time.sleep(1)
+        para = json.loads(flask.request.get_data())
+        videoPath = para['videoPath']
+        # file = flask.request.files.get('video_file')
+        # save_name = "./cache/" + time.strftime("%Y_%m_%d-%H_%M_%S") + ".mp4"
+        # file.save(save_name)
+        print(f'============= image stitch get mp4 file ======= path: {videoPath} ==================')
+        # time.sleep(1)
         status = '1'    # 1为异常，0为正常
-        return_img = cv_demo.App(save_name).run(debug=False)
+        return_img = cv_demo.App(videoPath).run(debug=False)
         retval, buffer = cv2.imencode('.jpg', return_img)
         pic = base64.b64encode(buffer)
         pic = pic.decode()
@@ -39,10 +39,11 @@ def imageStitch():
 
 
 def start_tornado(port=8700):
-    http_server = tornado.httpserver.HTTPServer(tornado.wsgi.WSGIContainer(app))
-    http_server.listen(port, address="0.0.0.0")
-    print(f"Tornado server starting on port {port}")
-    tornado.ioloop.IOLoop.instance().start()
+    # http_server = tornado.httpserver.HTTPServer(tornado.wsgi.WSGIContainer(app))
+    # http_server.listen(port, address="0.0.0.0")
+    # print(f"Tornado server starting on port {port}")
+    # tornado.ioloop.IOLoop.instance().start()
+    app.run('0.0.0.0', port=port, threaded=True)
 
 
 if __name__ == '__main__':

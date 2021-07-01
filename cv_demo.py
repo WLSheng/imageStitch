@@ -3,13 +3,15 @@ from __future__ import print_function
 import numpy as np
 import cv2
 import time
+import os
+import traceback
 
 
 lk_params = dict(winSize=(15, 15),  # 从下一帧中在金字塔找指定窗口大小的特征，增大些有益于匹配关键点，相机移动过快需要调大些
                  maxLevel=2,        # 金字塔数，0为不使用，
                  criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))  # 迭代搜索算法的终止准则，最大迭代数和迭代半径？
 
-feature_params = dict(maxCorners=200,
+feature_params = dict(maxCorners=500,
                       qualityLevel=0.3,
                       minDistance=7,
                       blockSize=7)
@@ -17,7 +19,7 @@ feature_params = dict(maxCorners=200,
 
 class App:
     def __init__(self, video_src):
-        print(f"拼接路径：{video_src}")
+        print(f"拼接服务收到路径：{video_src}")
         self.video_src = video_src
         self.track_len = 5
         self.detect_interval = 5    # 每5帧检测新的关键点，不延用上一帧的关键点做跟踪
@@ -30,7 +32,7 @@ class App:
         # self.frame_idx = self.start_frame
         self.first_frame = self.cam.read()[1]
         print("self.end_frame:", self.end_frame, self.first_frame.shape)
-        self.crop_para = 200     # 用于优化拼接速度的，从原图1/3位置往前的200行像素开始，到1/3位置往往后200行像素结束,这个参数可调
+        self.crop_para = 250     # 用于优化拼接速度的，从原图1/3位置往前的200行像素开始，到1/3位置往往后200行像素结束,这个参数可调
         if int(self.first_frame.shape[0]/3 - self.crop_para) < 0:
             self.crop_para = int(self.first_frame.shape[0]/3)
             print("裁剪参数会超出视频帧的范围，把裁剪参数设为帧高的1/3")
@@ -41,23 +43,24 @@ class App:
         self.first_frame = self.first_frame[int(self.first_frame.shape[0]/3 - self.crop_para): int(self.first_frame.shape[0]/3 + self.crop_para),
                            int(self.width/2 - int(self.width/self.col_para)):int(self.width/2 + int(self.width/self.col_para))].copy()
         self.last_frame = None
-        self.jump_frame = 2
+        self.jump_frame = 1
         self.prev_frame = None
 
     def run(self, debug=False):
         print("开始拼接......")
-        while self.start_and_now_frame < self.end_frame:
+        # while self.start_and_now_frame < self.end_frame:
+        while self.start_and_now_frame < 6000:
             _ret, org_frame = self.cam.read()
             if _ret:
                 self.prev_frame = org_frame.copy()
             if self.start_and_now_frame % self.jump_frame == 0:
                 t1 = time.time()
-                if not _ret or self.start_and_now_frame >= self.end_frame:
+                if not _ret or self.start_and_now_frame >= 6000:
                     print("_ret:", _ret, " , self.start_and_now_frame:", self.start_and_now_frame)
                     print("视频流有问题，读不到图片了，这里拿前一帧作为最后一帧，拼到最后面去")
                     self.last_frame = self.prev_frame
                     print(" 开始拼最后一张 ")
-                    crop_next_roi = self.last_frame[int(self.last_frame.shape[0] / 3):, :]
+                    crop_next_roi = self.last_frame[int(self.last_frame.shape[0] / 3)+self.crop_para:, :]
                     new_mask = np.zeros((self.add_result.shape[0] + crop_next_roi.shape[0], self.add_result.shape[1], 3), np.uint8)
                     new_mask[0:self.add_result.shape[0], :] = self.add_result
                     new_mask[self.add_result.shape[0]:, :] = crop_next_roi
@@ -132,7 +135,7 @@ class App:
                         # 第一阶段优化：用前半张图片进行拼接，拼到最后一张时再用最后一张直接全部拼上去
                         if self.last_frame is not None:
                             print(" 开始拼最后一张 ")
-                            crop_next_roi = self.last_frame[int(self.last_frame.shape[0]/3):, :]
+                            crop_next_roi = self.last_frame[int(self.last_frame.shape[0] / 3)+self.crop_para:, :]
                             new_mask = np.zeros((self.add_result.shape[0]+crop_next_roi.shape[0], self.add_result.shape[1], 3), np.uint8)
                             new_mask[0:self.add_result.shape[0], :] = self.add_result
                             new_mask[self.add_result.shape[0]:, :] = crop_next_roi
@@ -143,18 +146,18 @@ class App:
                     cv2.polylines(vis, [np.int32(tr) for tr in self.tracks], False, (0, 255, 0))
                     # draw_str(vis, (20, 20), 'track count: %d' % len(self.tracks))
 
-                if self.start_and_now_frame % self.detect_interval == 0:
-                    mask = np.zeros_like(frame_gray)
-                    mask[:] = 255
-                    for x, y in [np.int32(tr[-1]) for tr in self.tracks]:
-                        cv2.circle(mask, (x, y), 5, 0, -1)
-                    p = cv2.goodFeaturesToTrack(frame_gray, mask=mask, **feature_params)    # shi-Tomasi角点检测
-                    # print("p:", p)
-                    # print("p reshape:", np.float32(p).reshape(-1, 2))
-                    if p is not None:
-                        for x, y in np.float32(p).reshape(-1, 2):
-                            self.tracks.append([(x, y)])
-                    # print("self.tracks:", self.tracks)
+            if self.start_and_now_frame % self.detect_interval == 0:
+                mask = np.zeros_like(frame_gray)
+                mask[:] = 255
+                for x, y in [np.int32(tr[-1]) for tr in self.tracks]:
+                    cv2.circle(mask, (x, y), 5, 0, -1)
+                p = cv2.goodFeaturesToTrack(frame_gray, mask=mask, **feature_params)    # shi-Tomasi角点检测
+                # print("p:", p)
+                # print("p reshape:", np.float32(p).reshape(-1, 2))
+                if p is not None:
+                    for x, y in np.float32(p).reshape(-1, 2):
+                        self.tracks.append([(x, y)])
+                # print("self.tracks:", self.tracks)
 
             self.start_and_now_frame += 1
             self.prev_gray = frame_gray
@@ -168,10 +171,15 @@ class App:
         new_mask = np.zeros((self.add_result.shape[0]+self.first_up_half_img.shape[0], self.add_result.shape[1], 3), np.uint8)
         new_mask[0:self.first_up_half_img.shape[0], :] = self.first_up_half_img
         new_mask[self.first_up_half_img.shape[0]:, :] = self.add_result
-        # write_name = os.path.split(self.video_src)[-1].split(".")[0] + ".png"
-        write_name = self.video_src.replace("mp4", "png")
-        # cv2.imwrite(f"./{write_name}", self.add_result)
-        cv2.imwrite(f"./optimize_cost_time_5.png", new_mask)
+        try:
+            write_name = os.path.split(self.video_src)[1].split(".")[0] + ".png"
+        except:
+            print("制作路径发生未知的bug:", traceback.format_exc())
+            write_name = str(time.strftime("%Y_%m_%d-%H_%M_%S")) + ".png"
+
+        cv2.imwrite(f"./cache/{write_name}", self.add_result)
+        print("保存视频成功，路径：", write_name)
+        # cv2.imwrite(f"./optimize_cost_time_5.png", new_mask)
         return new_mask
 
 
@@ -182,13 +190,13 @@ def main():
         index = '4'
         # video_src = rf"F:\1_sheng\image_stitch\机柜\机柜{index}\机柜{index}视频.mp4"
         # video_src = rf"F:\1_sheng\image_stitch\机柜\机柜2\机柜2视频.mp4"
-        video_src = r"F:\1_sheng\image_stitch\机柜-2021-05-22\关门关灯\可见光.mp4"
+        video_src = r"F:\1_sheng\image_stitch\0630视频\c21ce7ae-481a-4246-b401-feb07a00fce8_193915.mp4"
         # video_src = rf"F:\1_sheng\image_stitch\42U机房正门\4.关门,开灯\3.开门，开灯.mp4"
         # video_src = rf"F:\1_sheng\image_stitch\0513_video_to_frame\WeChat_20210513110458.mp4"
     except:
         video_src = 0
 
-    App(video_src).run(debug=False)
+    App(video_src).run(debug=True)
     print('Done')
 
 

@@ -17,10 +17,10 @@ def test_send_zip():
     url = "http://127.0.0.1:8700/imageStitch"  # 后端api链接
     # f = open(r"F:\1_sheng\image_stitch\test_send.mp4", 'rb')  # 以二进制打开前端本地文件
     f = open(r"F:\1_sheng\image_stitch\机柜\机柜2\机柜2视频.mp4", 'rb')  # 以二进制打开前端本地文件
-    files = {'video_file': f}  # 将二进制文件封装为这样一个字典，索引为file
+    userdata = json.dumps({'videoPath': r"F:\1_sheng\image_stitch\test_path.mp4"})  # 将二进制文件封装为这样一个字典，索引为file
     t1 = time.time()
     print("开始发送拼接视频")
-    r = requests.post(url=url, files=files)
+    r = requests.post(url=url, data=userdata)
     para = json.loads(r.content)
     print(para['status'])
     # print(para['pic'])
