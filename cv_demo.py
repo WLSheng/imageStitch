@@ -32,7 +32,7 @@ class App:
         # self.frame_idx = self.start_frame
         self.first_frame = self.cam.read()[1]
         print("self.end_frame:", self.end_frame, self.first_frame.shape)
-        self.crop_para = 250     # 用于优化拼接速度的，从原图1/3位置往前的200行像素开始，到1/3位置往往后200行像素结束,这个参数可调
+        self.crop_para = 100     # 用于优化拼接速度的，从原图1/3位置往前的200行像素开始，到1/3位置往往后200行像素结束,这个参数可调
         if int(self.first_frame.shape[0]/3 - self.crop_para) < 0:
             self.crop_para = int(self.first_frame.shape[0]/3)
             print("裁剪参数会超出视频帧的范围，把裁剪参数设为帧高的1/3")
