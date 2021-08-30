@@ -14,7 +14,7 @@ import zipfile, requests
 
 
 def test_send_zip():
-    url = "http://127.0.0.1:8700/imageStitch"  # 后端api链接
+    url = "http://192.168.1.244:8700/imageStitch"  # 后端api链接
     # f = open(r"F:\1_sheng\image_stitch\test_send.mp4", 'rb')  # 以二进制打开前端本地文件
     # f = open(r"F:\1_sheng\image_stitch\机柜\机柜2\机柜2视频.mp4", 'rb')  # 以二进制打开前端本地文件
     userdata = json.dumps({'videoPath': r"F:\1_sheng\image_stitch\0811\kejianguan.mp4"})  # 将二进制文件封装为这样一个字典，索引为file
