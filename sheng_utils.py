@@ -1,4 +1,4 @@
-import time
+import time, os
 import cv2
 import numpy
 import imageio
@@ -315,11 +315,95 @@ def match_test_2():
         matchesMask = None
 
 
+def cv_imread(file_path):
+    # 读取中文路径下的图片
+    cv_img = cv2.imdecode(np.fromfile(file_path, dtype=np.uint8), -1)
+    if cv_img.shape[-1] == 4:
+        cv_img = cv2.cvtColor(cv_img, cv2.COLOR_RGBA2RGB)
+    return cv_img
+
+
+def rotate_img():
+    folder = r'F:\1_sheng\image_stitch\img2jpg\5_liang'
+    for i, name in enumerate(sorted(os.listdir(folder), reverse=True)):
+        img_path = os.path.join(folder, name)
+        print(img_path)
+        img = cv_imread(img_path)
+        img = np.rot90(img, k=2)
+        # cv2.imshow("111", img)
+        # cv2.waitKey(0)
+        cv2.imwrite(img_path, img)
+
+
+def ORB_Feature(img1, img2):
+    # 初始化ORB
+    orb = cv2.ORB_create()
+
+    # 寻找关键点
+    kp1 = orb.detect(img1)
+    kp2 = orb.detect(img2)
+
+    # 计算描述符
+    kp1, des1 = orb.compute(img1, kp1)
+    kp2, des2 = orb.compute(img2, kp2)
+
+    # 画出关键点
+    outimg1 = cv2.drawKeypoints(img1, keypoints=kp1, outImage=None)
+    outimg2 = cv2.drawKeypoints(img2, keypoints=kp2, outImage=None)
+
+    # 显示关键点
+    # import numpy as np
+    # outimg3 = np.hstack([outimg1, outimg2])
+    # cv2.imshow("Key Points", outimg3)
+    # cv2.waitKey(0)
+
+    # 初始化 BFMatcher
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING)
+
+    # 对描述子进行匹配
+    matches = bf.match(des1, des2)
+
+    # 计算最大距离和最小距离
+    min_distance = matches[0].distance
+    max_distance = matches[0].distance
+    for x in matches:
+        if x.distance < min_distance:
+            min_distance = x.distance
+        if x.distance > max_distance:
+            max_distance = x.distance
+
+    # 筛选匹配点
+    '''
+        当描述子之间的距离大于两倍的最小距离时，认为匹配有误。
+        但有时候最小距离会非常小，所以设置一个经验值30作为下限。
+    '''
+    good_match = []
+    for x in matches:
+        if x.distance <= max(2 * min_distance, 30):
+            good_match.append(x)
+
+    # 绘制匹配结果
+    draw_match(img1, img2, kp1, kp2, good_match)
+
+
+def draw_match(img1, img2, kp1, kp2, match):
+    cv2.namedWindow("Match Result", 0)
+    # cv2.re
+    outimage = cv2.drawMatches(img1, kp1, img2, kp2, match, outImg=None)
+    cv2.imshow("Match Result", outimage)
+    cv2.waitKey(0)
+
+
 if __name__ == '__main__':
     # cut_video()
     # imageio_cut_video()
     # video2jpg()
     # two_diff()
-    test_fft_2()
+    # test_fft_2()
     # match_test_2()
+    # rotate_img()
+    image1 = cv2.imread(r'F:\1_sheng\image_stitch\img2jpg\10\0084.jpg')
+    image2 = cv2.imread(r'F:\1_sheng\image_stitch\img2jpg\10\0126.jpg')
+    ORB_Feature(image1, image2)
+
     print("~_~")

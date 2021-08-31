@@ -5,7 +5,6 @@ import cv2
 import time
 import os
 import traceback
-from threading import Thread
 
 lk_params = dict(winSize=(30, 30),  # 从下一帧中在金字塔找指定窗口大小的特征，增大些有益于匹配关键点，相机移动过快需要调大些
                  maxLevel=5,  # 金字塔数，0为不使用，
@@ -18,8 +17,6 @@ feature_params = dict(maxCorners=200,
 
 
 def find_sobel(gray):
-    if len(gray.shape) == 3:
-        gray = cv2.cvtColor(gray, cv2.COLOR_BGR2GRAY)
     sobel_type = cv2.CV_64F
     sobel_size = 1  # 一/二阶导数
     sobel_ksize = 7
@@ -40,17 +37,20 @@ def find_sobel(gray):
 
 
 class BatchImg:
-    def __init__(self, batchimg):
-        self.org_img0, self.org_img1 = batchimg
+    def __init__(self, batch_path):
+        self.batch_path = batch_path
+        self.img_name_list = sorted(os.listdir(batch_path))
+        print(self.img_name_list)
         self.frame_now_num = 0
+        self.all_frame = len(self.img_name_list) + 2
         self.crop_start_y = 300
-        # self.org_img0 = cv2.imread(r'F:\1_sheng\image_stitch\img2jpg\10_max\1225,400000.jpg')
-        # fscale = 0.5
-        fscale = scale_height/self.org_img0.shape[0]
+        # self.org_img0 = cv2.imread(r'F:\1_sheng\image_stitch\img2jpg\20\0105.jpg')
+        self.org_img0 = cv2.imread(r'F:\1_sheng\image_stitch\img2jpg\10_max\1225,400000.jpg')
+        fscale = 0.3
         self.org_img0 = cv2.resize(self.org_img0, (0, 0), fx=fscale, fy=fscale)
         self.img0 = self.org_img0.copy()
-        self.all_frame_num = self.org_img0.shape[0]/3
-        # self.org_img1 = cv2.imread(r'F:\1_sheng\image_stitch\img2jpg\10_max\1045,400000.jpg')
+        # self.img0 = find_sobel(cv2.imread(r'F:\1_sheng\image_stitch\img2jpg\20\0042.jpg', 0))
+        self.org_img1 = cv2.imread(r'F:\1_sheng\image_stitch\img2jpg\10_max\1045,400000.jpg')
         self.org_img1 = cv2.resize(self.org_img1, (0, 0), fx=fscale, fy=fscale)
         self.img1 = self.org_img1.copy()
 
@@ -75,15 +75,18 @@ class BatchImg:
 
 
 class App:
-    def __init__(self, img_list, stitch_key):
-        self.stitch_key = stitch_key
+    def __init__(self, video_src):
+        print(f"拼接服务收到路径：{video_src}")
+        self.video_src = video_src
         self.track_len = 5
         self.detect_interval = 2  # 每5帧检测新的关键点，不延用上一帧的关键点做跟踪
         self.tracks = []
-        self.cam = BatchImg(img_list)
+        self.cam = BatchImg(video_src)
         self.start_and_now_frame = 0
-        self.all_frmae_num = self.cam.all_frame_num
+        self.end_frame = self.cam.all_frame
+        self.all_frmae_num = self.cam.all_frame
         self.first_frame = self.cam.img1
+        print("self.end_frame:", self.end_frame, self.first_frame.shape)
         self.crop_para = 300  # 用于优化拼接速度的，从原图1/3位置往前的200行像素开始，到1/3位置往往后200行像素结束,这个参数可调
         # if int(self.first_frame.shape[0]/3 - self.crop_para) < 0:
         #     self.crop_para = int(self.first_frame.shape[0]/3)
@@ -95,7 +98,7 @@ class App:
         # self.first_frame = self.first_frame[int(self.first_frame.shape[0]/3 - self.crop_para): int(self.first_frame.shape[0]/3 + self.crop_para),
         #                    int(self.width/2 - int(self.width/self.col_para)):int(self.width/2 + int(self.width/self.col_para))].copy()
         self.last_frame = None
-        self.jump_frame = 2
+        self.jump_frame = 1
         self.prev_frame = None
 
     def run(self, debug=False):
@@ -142,12 +145,14 @@ class App:
                 frame = org_frame.copy()
                 frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 vis = frame.copy()
+                # print(f"len(self.tracks):{len(self.tracks)}")
                 if len(self.tracks) > 0:  # and self.frame_idx % self.detect_interval == 0:
                     # img0, img1 = self.prev_gray, frame_gray
                     img0, img1 = cv2.cvtColor(self.first_frame, cv2.COLOR_BGR2GRAY), frame_gray
-                    if debug:
-                        cv2.imshow("img1", img0)
-                        cv2.imshow("img2", img1)
+                    # cv2.imshow("img1", self.first_frame)
+                    # cv2.imshow("img2", org_frame)
+                    cv2.imshow("img1", img0)
+                    cv2.imshow("img2", img1)
                     # cv2.waitKey(0)
                     p0 = np.float32([tr[-1] for tr in self.tracks]).reshape(-1, 1, 2)
                     # 前一帧的角点和当前帧的图像作为输入来得到角点在当前帧的位置
@@ -196,7 +201,7 @@ class App:
                         diff_y = new_diff_y
                         collect_offset_y.append(diff_y)
                         print(
-                            f"key:{self.stitch_key}, self.all_frmae_num:{self.all_frmae_num}, self.start_and_now_frame:{self.start_and_now_frame}, "
+                            f"self.all_frmae_num:{self.all_frmae_num}, self.start_and_now_frame:{self.start_and_now_frame}, "
                             f"diff_y:{diff_y}, send time:{time.time() - t_start}")
                         frame_list.append(self.start_and_now_frame)
                         frame_diff_y_list.append(diff_y)
@@ -257,6 +262,22 @@ class App:
                 coor = frame_index
                 # print("y:", frame_index, oy)
                 # break
+            #     status = True
+            #     if lx == 0:
+            #         lx = 1
+            #     else:
+            #         lx += 1
+            # else:
+            #     status = False
+            # if pre_status != status:
+            #     coor_list.append(y)
+            #     len_list.append(lx)
+            #     lx = 0
+            # pre_status = status
+        # print(len(coor_list), len(len_list))
+        # print(coor_list, len_list)
+        # max_len_coor = int(np.argmax(np.asarray(len_list)))
+        # max_len_coor = coor_list[max_len_coor]
         max_len_coor = coor# * self.jump_frame
         print(f"两张图片对比的偏移量:{max_len_coor}")
 
@@ -266,65 +287,52 @@ class App:
         new_mask = np.zeros((org_img0.shape[0] + max_len_coor, org_img0.shape[1], 3),
                             np.uint8)
         new_mask[0:org_img0.shape[0], :, :] = org_img0
-        temp_crop_img = org_img1[int(org_img1.shape[0]-max_len_coor):, :, :].copy()
-        new_mask[org_img0.shape[0]:, :] = temp_crop_img
-        write_name = str(time.strftime("%Y_%m_%d-%H_%M_%S")) + ".png"
+        new_mask[org_img0.shape[0]:, :] = org_img1[int(org_img1.shape[0]-max_len_coor):, :, :]
+        try:
+            write_name = os.path.split(self.video_src)[1].split(".")[0] + ".png"
+        except:
+            print("制作路径发生未知的bug:", traceback.format_exc())
+            write_name = str(time.strftime("%Y_%m_%d-%H_%M_%S")) + ".png"
 
-        # cv2.imwrite(f"./cache/{write_name}", new_mask)
-        # print(f"保存拼接成功，路径：./cache/{write_name}, key:{self.stitch_key}")
-        global all_crop_img
-        all_crop_img[self.stitch_key] = temp_crop_img
+        cv2.imwrite(f"./cache/{write_name}", new_mask)
+        print(f"保存拼接成功，路径：./cache/{write_name}")
+        # cv2.imwrite(f"./optimize_cost_time_5.png", new_mask)
+        return new_mask
 
 
-def main(temp_img0, temp_img1, stitch_key):
-    App([temp_img0, temp_img1], stitch_key).run(debug=False)
+def main():
+    import sys
+    try:
+        # video_src = sys.argv[1]
+        index = '4'
+        # video_src = rf"F:\1_sheng\image_stitch\机柜\机柜{index}\机柜{index}视频.mp4"
+        # video_src = rf"F:\1_sheng\image_stitch\机柜\机柜2\机柜2视频.mp4"
+        video_src = r"F:\1_sheng\image_stitch\img2jpg\30"
+        # video_src = rf"F:\1_sheng\image_stitch\42U机房正门\4.关门,开灯\3.开门，开灯.mp4"
+        # video_src = rf"F:\1_sheng\image_stitch\0513_video_to_frame\WeChat_20210513110458.mp4"
+    except:
+        video_src = 0
+
+    App(video_src).run(debug=True)
     print('Done')
-
-
-def multi_process(img_list):
-    # img0, img1, img2, img3, img4, img5, img6, img7, img8, img9 = img_list
-    for i in range(len(img_list)-1):
-        print("main for i :", i)
-        p_app = Thread(target=main, args=[img_list[i], img_list[i+1], f"{str(i).zfill(2)}{str(i+1).zfill(2)}"])
-        p_app.start()
-    global all_crop_img
-    while True:
-        if all_crop_img.keys().__len__() == len(img_list) - 1:
-            key_list = sorted(all_crop_img.keys())
-            print("key_list:", key_list)
-            add_img = img_list[0]
-            fscale = scale_height/add_img.shape[0]
-            add_img = cv2.resize(add_img, (0, 0), fx=fscale, fy=fscale)
-            for k in key_list:
-                crop_img = all_crop_img[k]
-                temp_add_img = np.zeros((add_img.shape[0] + crop_img.shape[0], add_img.shape[1], 3), dtype=np.uint8)
-                temp_add_img[0:add_img.shape[0], :, :] = add_img
-                # print(f"crop_img.shape:{crop_img.shape}, temp_add_img.shape:{temp_add_img.shape}")
-                temp_add_img[add_img.shape[0]:, :] = crop_img
-                add_img = temp_add_img.copy()
-                print(f"k :{k}, crop img shape:", crop_img.shape)
-
-            write_name = "collect_" + str(time.strftime("%Y_%m_%d-%H_%M_%S")) + ".png"
-            cv2.imwrite(f"./cache/{write_name}", add_img)
-            print("开始拼接汇总 -------------")
-            break
-    return None
-
-
-global all_crop_img
-all_crop_img = {}
-scale_height = 1080
 
 
 if __name__ == '__main__':
     t1 = time.time()
-    img_l = []
-    folder = r'F:\1_sheng\image_stitch\img2jpg\10'
-    for i, name in enumerate(sorted(os.listdir(folder), reverse=False)):
-        img_path = os.path.join(folder, name)
-        print(i, img_path)
-        main_img = find_sobel(cv2.imread(img_path))
-        img_l.append(main_img)
-    multi_process(img_l)
+    main()
     print("耗时：", time.time() - t1)
     cv2.destroyAllWindows()
+
+'''
+    def read(self):
+        try:
+            _img_path = os.path.join(self.batch_path, self.img_name_list[self.frame_now_num])
+            img = cv2.imread(_img_path, 1)
+            # img = find_sobel(img)
+            print(self.frame_now_num, _img_path)
+            self.frame_now_num += 1
+            return True, img
+        except:
+            print(f"批量图片读取遇到bug:{traceback.format_exc()}")
+            return False, None
+'''
